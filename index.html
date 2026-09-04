@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Little Market Adventure</title>
+  
+  <!-- Pustaka Imbas Kod Bar Kamera & Generator Kod Bar (JsBarcode) -->
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+
+  <style>
+    * { box-sizing: border-box; font-family: 'Comic Sans MS', 'Chalkboard SE', sans-serif; }
+    body { background-color: #f0f9ff; margin: 0; padding: 15px; color: #1e293b; }
+    
+    .layout { display: flex; flex-wrap: wrap; gap: 15px; max-width: 1000px; margin: 0 auto; }
+    .panel { background: white; border-radius: 20px; padding: 15px; box-shadow: 0 8px 15px rgba(0,0,0,0.05); flex: 1; min-width: 300px; }
+    
+    h1, h2, h3 { text-align: center; margin-top: 0; color: #0284c7; }
+    
+    /* Input Pengimbas Fizikal USB/Bluetooth */
+    .scanner-box { background: #e0f2fe; padding: 10px; border-radius: 12px; border: 2px solid #0284c7; margin-bottom: 12px; text-align: center; }
+    .scanner-input { width: 85%; padding: 8px; font-size: 16px; border-radius: 8px; border: 1px solid #cbd5e1; text-align: center; }
+
+    /* Grid Katalog */
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; margin-bottom: 10px; }
+    .item-card { background: #f8fafc; border: 3px solid #38bdf8; border-radius: 15px; padding: 10px; text-align: center; cursor: pointer; transition: transform 0.1s; }
+    .item-card:active { transform: scale(0.95); }
+    .item-img { width: 60px; height: 60px; object-fit: contain; margin-bottom: 5px; }
+    .item-name { font-size: 14px; font-weight: bold; }
+    .item-price { color: #16a34a; font-weight: bold; }
+    
+    /* Ruang Kod Bar Produk */
+    .barcode-display { margin-top: 5px; background: white; padding: 2px; border-radius: 5px; }
+    .barcode-display svg { width: 100%; height: 40px; }
+
+    /* Pengimbas Kamera Gajet */
+    #reader { width: 100%; border-radius: 15px; overflow: hidden; border: 2px dashed #0284c7; margin-bottom: 10px; }
+
+    /* Troli & Paparan Utama */
+    .cart-list { background: #f1f5f9; border-radius: 10px; padding: 10px; min-height: 100px; max-height: 140px; overflow-y: auto; font-size: 14px; }
+    .cart-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; background: white; padding: 5px 10px; border-radius: 6px; }
+    .cart-item-img { width: 25px; height: 25px; vertical-align: middle; margin-right: 5px; }
+
+    .total-display { font-size: 22px; text-align: center; color: #0369a1; margin: 8px 0; background: #e0f2fe; padding: 8px; border-radius: 10px; font-weight: bold; }
+    .paid-display { font-size: 20px; text-align: center; color: #b45309; margin: 8px 0; background: #fef3c7; padding: 8px; border-radius: 10px; font-weight: bold; }
+
+    /* BAKUL STATUS BAKI REAL-TIME */
+    .change-live-box {
+      font-size: 24px;
+      font-weight: 900;
+      text-align: center;
+      padding: 12px;
+      border-radius: 12px;
+      margin: 10px 0;
+      transition: all 0.3s ease;
+      background-color: #f1f5f9;
+      color: #64748b;
+      border: 2px solid #cbd5e1;
+    }
+    .change-live-box.sufficient {
+      background-color: #dcfce7;
+      color: #15803d;
+      border: 3px solid #22c55e;
+      animation: pulse 1.5s infinite;
+    }
+    .change-live-box.insufficient {
+      background-color: #fee2e2;
+      color: #b91c1c;
+      border: 2px dashed #ef4444;
+    }
+
+    /* Pad Bayaran */
+    .money-grid { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+    .btn-money { background: #fef08a; border: 2px solid #eab308; border-radius: 8px; padding: 8px 12px; font-weight: bold; cursor: pointer; font-size: 15px; }
+    .btn-action { width: 100%; padding: 12px; font-size: 18px; font-weight: bold; color: white; border: none; border-radius: 12px; cursor: pointer; margin-top: 5px; }
+    .btn-scan { background: #0284c7; }
+    .btn-pay { background: #22c55e; }
+    .btn-reset { background: #ef4444; }
+
+    /* MODAL RESIT & POP-UP AMARAN */
+    .overlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.6); justify-content: center; align-items: center; z-index: 1000; }
+    .modal-box { background: white; padding: 25px; border-radius: 25px; text-align: center; max-width: 360px; width: 90%; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+    
+    .receipt-box { border: 4px dashed #0284c7; }
+    .warning-box { border: 4px solid #ef4444; background: #fff5f5; }
+
+    .big-change-card {
+      background: #f0fdf4;
+      border: 4px solid #22c55e;
+      border-radius: 18px;
+      padding: 15px;
+      margin: 15px 0;
+      box-shadow: 0 4px 12px rgba(34, 197, 94, 0.2);
+      animation: pulse 1.2s infinite;
+    }
+    .big-change-title { font-size: 20px; font-weight: bold; color: #166534; margin-bottom: 5px; }
+    .big-change-amount { font-size: 50px; font-weight: 900; color: #15803d; line-height: 1; }
+
+    .warning-card {
+      background: #fee2e2;
+      border: 3px dashed #ef4444;
+      border-radius: 18px;
+      padding: 15px;
+      margin: 15px 0;
+    }
+    .warning-amount { font-size: 32px; font-weight: 900; color: #dc2626; margin-top: 5px; }
+
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.03); }
+      100% { transform: scale(1); }
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Little Market Adventure 🛒</h1>
+
+  <div class="layout">
+    <!-- PANEL KIRI: Kawasan Imbasan & Katalog -->
+    <div class="panel">
+      <h3>1. Imbas / Pilih Barang</h3>
+      
+      <!-- PENGIMBAS 1: Mesin Barcode USB/Bluetooth -->
+      <div class="scanner-box">
+        <label for="barcodeInput"><b>🔌 Mesin Pengimbas Fizikal:</b></label><br>
+        <input type="text" id="barcodeInput" class="scanner-input" placeholder="Halakan mesin pengimbas..." autofocus>
+      </div>
+
+      <!-- PENGIMBAS 2: Kamera Peranti (Handphone/Tablet) -->
+      <button class="btn-action btn-scan" onclick="playKeypadSound(); toggleCamera()">📷 Buka / Tutup Imbasan Kamera Gajet</button>
+      <div id="reader"></div>
+
+      <h4 style="margin: 8px 0;">Atau Ketik / Imbas Barcode Produk:</h4>
+      <div class="grid" id="katalog"></div>
+    </div>
+
+    <!-- PANEL KANAN: Troli, Bayaran & Baki Real-Time -->
+    <div class="panel">
+      <h3>2. Troli & Bayaran</h3>
+      
+      <div class="cart-list" id="cart">
+        <p style="text-align: center; color: #94a3b8;">Belum ada barang dipilih...</p>
+      </div>
+
+      <div class="total-display">Jumlah Harga: RM <span id="total-val">0</span></div>
+      <div class="paid-display">Wang Diterima: RM <span id="paid-val">0</span></div>
+
+      <!-- STATUS BAKI WANG REAL-TIME -->
+      <div class="change-live-box" id="live-change-box">
+        Baki: RM 0
+      </div>
+
+      <h4 style="margin: 8px 0; text-align: center;">Masukkan Wang:</h4>
+      <div class="money-grid">
+        <button class="btn-money" onclick="tambahWang(1)">+ RM1 🪙</button>
+        <button class="btn-money" onclick="tambahWang(5)">+ RM5 💵</button>
+        <button class="btn-money" onclick="tambahWang(10)">+ RM10 💵</button>
+      </div>
+
+      <button class="btn-action btn-pay" onclick="prosesBayaran()">Selesai & Bayar 💵</button>
+      <button class="btn-action btn-reset" onclick="playKeypadSound(); resetSemua()">Reset / Kosongkan</button>
+    </div>
+  </div>
+
+  <!-- POP-UP RESIT BAKI DIBESARKAN -->
+  <div class="overlay" id="receiptModal">
+    <div class="modal-box receipt-box">
+      <h2 style="margin-bottom: 5px;">🧾 RESIT KEDAI</h2>
+      <p style="margin-top: 0; color: #64748b;">Pembayaran Berjaya!</p>
+      
+      <div id="receipt-summary" style="font-size: 16px; text-align: left; background: #f8fafc; padding: 10px; border-radius: 10px; margin-bottom: 10px;"></div>
+      
+      <!-- BAKI WANG MENYERLAH -->
+      <div class="big-change-card">
+        <div class="big-change-title">💵 PULANGKAN BAKI:</div>
+        <div class="big-change-amount" id="modal-baki-val">RM 0</div>
+      </div>
+
+      <button class="btn-action btn-scan" onclick="playKeypadSound(); tutupResit()">Tutup & Main Lagi 🔄</button>
+    </div>
+  </div>
+
+  <!-- POP-UP AMARAN WANG TIDAK CUKUP -->
+  <div class="overlay" id="warningModal">
+    <div class="modal-box warning-box">
+      <h2 style="margin-bottom: 5px; color: #dc2626;" id="warning-title">⚠️ WANG TIDAK CUKUP!</h2>
+      <p style="margin-top: 0; color: #7f1d1d;" id="warning-subtitle">Sila tambah wang lagi untuk buat bayaran.</p>
+      
+      <div class="warning-card" id="warning-content">
+        <div style="font-size: 16px; color: #991b1b; font-weight: bold;">Sila Tambah Lagi:</div>
+        <div class="warning-amount" id="warning-lack-val">RM 0</div>
+      </div>
+
+      <button class="btn-action btn-reset" onclick="playKeypadSound(); tutupAmaran()">Tambah Wang 💵</button>
+    </div>
+  </div>
+
+  <!-- Audio Resit (Nama fail tanpa ruang jarak) -->
+  <audio id="receiptAudio" src="pop-up-sound.mp3" preload="auto"></audio>
+
+  <script>
+    // Katalog Produk
+    const produkList = [
+      { id: "1001", nama: "Epal", harga: 2, img: "epal.png" },
+      { id: "1002", nama: "Mangga", harga: 4, img: "mangga.png" },
+      { id: "1003", nama: "Oren", harga: 3, img: "orange.png" },
+      { id: "1004", nama: "Anggur", harga: 5, img: "anggur.png" }
+    ];
+
+    let troli = [];
+    let jumlahHarga = 0;
+    let jumlahBayaran = 0;
+    let html5QrcodeScanner = null;
+    let cameraActive = false;
+    let lastScannedCode = "";
+    let lastScanTime = 0;
+
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    function playBeep(freq = 800, duration = 0.08) {
+      try {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.frequency.value = freq;
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+      } catch (e) { console.log(e); }
+    }
+
+    function playKeypadSound() {
+      try {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(1200, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(400, audioCtx.currentTime + 0.05);
+        gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.05);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.05);
+      } catch (e) { console.log(e); }
+    }
+
+    function playWarningSound() {
+      try {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(220, audioCtx.currentTime);
+        osc.frequency.setValueAtTime(180, audioCtx.currentTime + 0.15);
+        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.3);
+      } catch (e) { console.log(e); }
+    }
+
+    function playReceiptSound() {
+      const audio = document.getElementById('receiptAudio');
+      if (audio) {
+        audio.currentTime = 0;
+        audio.play().catch(e => console.log("Gagal memainkan audio:", e));
+      }
+    }
+
+    const katalogEl = document.getElementById('katalog');
+    produkList.forEach(item => {
+      const itemHTML = `
+        <div class="item-card" onclick="tambahKeTroli('${item.id}')">
+          <img src="${item.img}" alt="${item.nama}" class="item-img"><br>
+          <span class="item-name">${item.nama}</span><br>
+          <span class="item-price">RM ${item.harga}</span>
+          <div class="barcode-display">
+            <svg id="barcode-${item.id}"></svg>
+          </div>
+        </div>
+      `;
+      katalogEl.innerHTML += itemHTML;
+    });
+
+    setTimeout(() => {
+      produkList.forEach(item => {
+        JsBarcode(`#barcode-${item.id}`, item.id, {
+          format: "CODE128",
+          width: 1.5,
+          height: 30,
+          displayValue: true,
+          fontSize: 10,
+          margin: 2
+        });
+      });
+    }, 100);
+
+    const barcodeInput = document.getElementById('barcodeInput');
+    barcodeInput.addEventListener('keypress', function (e) {
+      if (e.key === 'Enter') {
+        const scannedCode = barcodeInput.value.trim();
+        if (scannedCode) {
+          prosesKodBar(scannedCode);
+        }
+        barcodeInput.value = '';
+      }
+    });
+
+    document.addEventListener('click', function(e) {
+      if (e.target.tagName !== 'BUTTON' && e.target.tagName !== 'INPUT') {
+        barcodeInput.focus();
+      }
+    });
+
+    function prosesKodBar(code) {
+      const produk = produkList.find(p => p.id === code);
+      if (produk) {
+        tambahKeTroli(code);
+      } else {
+        tunjukAmaran("⚠️ KOD UNKNOWN!", `Kod bar [${code}] tiada dalam sistem!`, "");
+      }
+    }
+
+    function tambahKeTroli(id) {
+      const produk = produkList.find(p => p.id === id);
+      if (produk) {
+        troli.push(produk);
+        jumlahHarga += produk.harga;
+        playBeep(800, 0.08);
+        kemaskiniUI();
+      }
+    }
+
+    function kemaskiniUI() {
+      const cartEl = document.getElementById('cart');
+      if (troli.length === 0) {
+        cartEl.innerHTML = `<p style="text-align: center; color: #94a3b8;">Belum ada barang dipilih...</p>`;
+      } else {
+        cartEl.innerHTML = troli.map(item => `
+          <div class="cart-item">
+            <span><img src="${item.img}" class="cart-item-img"> ${item.nama}</span>
+            <b>RM ${item.harga}</b>
+          </div>
+        `).join('');
+      }
+      
+      document.getElementById('total-val').innerText = jumlahHarga;
+      document.getElementById('paid-val').innerText = jumlahBayaran;
+
+      const liveBox = document.getElementById('live-change-box');
+      const bakiSemasa = jumlahBayaran - jumlahHarga;
+
+      if (jumlahHarga === 0) {
+        liveBox.className = "change-live-box";
+        liveBox.innerText = "Baki: RM 0";
+      } else if (jumlahBayaran < jumlahHarga) {
+        liveBox.className = "change-live-box insufficient";
+        liveBox.innerText = `Wang Kurang: RM ${Math.abs(bakiSemasa)}`;
+      } else {
+        liveBox.className = "change-live-box sufficient";
+        liveBox.innerText = `Baki Pulangan: RM ${bakiSemasa} 🎉`;
+      }
+    }
+
+    function tambahWang(nilai) {
+      playKeypadSound();
+      jumlahBayaran += nilai;
+      kemaskiniUI();
+    }
+
+    function tunjukAmaran(tajuk, sub, kekutanganText) {
+      playWarningSound();
+      document.getElementById('warning-title').innerText = tajuk;
+      document.getElementById('warning-subtitle').innerText = sub;
+      
+      const contentCard = document.getElementById('warning-content');
+      if (kekutanganText) {
+        contentCard.style.display = 'block';
+        document.getElementById('warning-lack-val').innerText = kekutanganText;
+      } else {
+        contentCard.style.display = 'none';
+      }
+
+      document.getElementById('warningModal').style.display = 'flex';
+    }
+
+    function tutupAmaran() {
+      document.getElementById('warningModal').style.display = 'none';
+      barcodeInput.focus();
+    }
+
+    function prosesBayaran() {
+      playKeypadSound();
+      if (jumlahHarga === 0) {
+        tunjukAmaran("🛒 TROLI KOSONG!", "Sila imbas atau pilih barang terlebih dahulu!", "");
+        return;
+      }
+      if (jumlahBayaran < jumlahHarga) {
+        const kekurangan = jumlahHarga - jumlahBayaran;
+        tunjukAmaran("💵 WANG TIDAK CUKUP!", "Sila masukkan duit lagi untuk buat pembayaran.", `RM ${kekurangan}`);
+        return;
+      }
+
+      playReceiptSound();
+      const baki = jumlahBayaran - jumlahHarga;
+
+      document.getElementById('receipt-summary').innerHTML = `
+        <div>🛒 <b>Jumlah Items:</b> ${troli.length} barang</div>
+        <div>💰 <b>Jumlah Harga:</b> RM ${jumlahHarga}</div>
+        <div>💵 <b>Wang Diterima:</b> RM ${jumlahBayaran}</div>
+      `;
+      
+      document.getElementById('modal-baki-val').innerText = `RM ${baki}`;
+      document.getElementById('receiptModal').style.display = 'flex';
+    }
+
+    function tutupResit() {
+      document.getElementById('receiptModal').style.display = 'none';
+      resetSemua();
+    }
+
+    function resetSemua() {
+      troli = [];
+      jumlahHarga = 0;
+      jumlahBayaran = 0;
+      kemaskiniUI();
+      barcodeInput.focus();
+    }
+
+    function toggleCamera() {
+      if (cameraActive) {
+        html5QrcodeScanner.clear();
+        cameraActive = false;
+      } else {
+        html5QrcodeScanner = new Html5QrcodeScanner("reader", { 
+          fps: 10, 
+          qrbox: { width: 250, height: 150 } 
+        });
+        
+        html5QrcodeScanner.render((decodedText) => {
+          const now = Date.now();
+          if (decodedText === lastScannedCode && (now - lastScanTime) < 1500) {
+            return;
+          }
+          lastScannedCode = decodedText;
+          lastScanTime = now;
+          prosesKodBar(decodedText);
+        }, () => {});
+        
+        cameraActive = true;
+      }
+    }
+  </script>
+</body>
+</html>
